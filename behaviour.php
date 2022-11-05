@@ -113,7 +113,8 @@ class qbehaviour_appstester extends question_behaviour_with_multiple_tries {
 
     public function process_submit(question_attempt_pending_step $pendingstep)
     {
-        if ($this->qa->get_state()->is_finished()) {
+        //TODO: get rid of hardcode (maybe by finding more suitable state than "needsgrading")
+        if ($this->qa->get_state()->is_finished() && $this->qa->get_state() !== question_state::$needsgrading) {
             return question_attempt::DISCARD;
         }
 
@@ -155,9 +156,9 @@ class qbehaviour_appstester extends question_behaviour_with_multiple_tries {
 
             $pendingstep->set_fraction($max_fraction);
 
-            if ($max_fraction === 1) {
+            if ($max_fraction == 1.0) {
                 $pendingstep->set_state(question_state::$gradedright);
-            } else if ($max_fraction === 0) {
+            } else if ($max_fraction == 0.0) {
                 $pendingstep->set_state(question_state::$gradedwrong);
             } else {
                 $pendingstep->set_state(question_state::$gradedpartial);
@@ -169,9 +170,18 @@ class qbehaviour_appstester extends question_behaviour_with_multiple_tries {
 
     public function process_save(question_attempt_pending_step $pendingstep)
     {
-        $status = parent::process_save($pendingstep);
-        if ($status == question_attempt::KEEP &&
-            $pendingstep->get_state() == question_state::$complete) {
+        if ($this->qa->get_state()->is_finished() && $this->qa->get_state() !== question_state::$needsgrading) {
+            return question_attempt::DISCARD;
+        }
+
+        if ($this->is_complete_response($pendingstep)) {
+            $pendingstep->set_state(question_state::$needsgrading);
+        } else {
+            $pendingstep->set_state(question_state::$invalid);
+        }
+
+        $status = question_attempt::KEEP;
+        if ($pendingstep->get_state() == question_state::$complete) {
             $pendingstep->set_state(question_state::$todo);
         }
         return $status;

@@ -59,12 +59,14 @@ class qbehaviour_appstester extends question_behaviour_with_multiple_tries {
     {
         $state = $this->qa->get_state();
 
-        if ($state === question_state::$needsgrading) {
+        if ($state === question_state::$complete) {
             if ($this->qa->get_last_step()->has_behaviour_var('status')) {
                 return get_string('checking', 'qbehaviour_appstester');
             }
 
             return get_string('in_queue', 'qbehaviour_appstester');
+        } else if ($state === question_state::$invalid) {
+            return get_string('checked', 'qbehaviour_appstester');
         }
 
         return parent::get_state_string($showcorrectness);
@@ -118,10 +120,10 @@ class qbehaviour_appstester extends question_behaviour_with_multiple_tries {
             return question_attempt::DISCARD;
         }
 
-        if (!$this->is_complete_response($pendingstep)) {
-            $pendingstep->set_state(question_state::$invalid);
+        if (!$this->is_complete_response($pendingstep)) { //TODO: refactor is_complete_response() or this code sample
+            $pendingstep->set_state(question_state::$needsgrading); // not reachable case, is_complete_response is always true
         } else {
-            $pendingstep->set_state(question_state::$needsgrading);
+            $pendingstep->set_state(question_state::$complete);
             $pendingstep->set_fraction(0);
 
 
@@ -156,6 +158,7 @@ class qbehaviour_appstester extends question_behaviour_with_multiple_tries {
 
             $pendingstep->set_fraction($max_fraction);
 
+            //TODO: handle grading with some finished state for not yet checked attempts (probably with behaviour_vars or checking state of last attempt)
             if ($max_fraction == 1.0) {
                 $pendingstep->set_state(question_state::$gradedright);
             } else if ($max_fraction == 0.0) {
@@ -170,20 +173,20 @@ class qbehaviour_appstester extends question_behaviour_with_multiple_tries {
 
     public function process_save(question_attempt_pending_step $pendingstep)
     {
-        if ($this->qa->get_state()->is_finished() && $this->qa->get_state() !== question_state::$needsgrading) {
+        if ($this->qa->get_state()->is_finished() && $this->qa->get_state() /* !== question_state::$needsgrading */) {
             return question_attempt::DISCARD;
         }
 
         if ($this->is_complete_response($pendingstep)) {
-            $pendingstep->set_state(question_state::$needsgrading);
+            $pendingstep->set_state(question_state::$complete);
         } else {
-            $pendingstep->set_state(question_state::$invalid);
+            $pendingstep->set_state(question_state::$needsgrading); // not reachable case, is_complete_response is always true
         }
 
         $status = question_attempt::KEEP;
-        if ($pendingstep->get_state() == question_state::$complete) {
+//        if ($pendingstep->get_state() == question_state::$complete) { // not sure if this case is reachable and\or needed
             $pendingstep->set_state(question_state::$todo);
-        }
+//        }
         return $status;
     }
 }

@@ -67,6 +67,11 @@ class qbehaviour_appstester extends question_behaviour_with_multiple_tries {
             return get_string('in_queue', 'qbehaviour_appstester');
         } else if ($state === question_state::$invalid) {
             return get_string('checked', 'qbehaviour_appstester');
+        } else if ($state === question_state::$finished) {
+            if ($this->qa->get_step($this->qa->get_num_steps()-2)->has_behaviour_var('status')) {
+                return get_string('checking', 'qbehaviour_appstester');
+            }
+            return get_string('in_queue', 'qbehaviour_appstester');
         }
 
         return parent::get_state_string($showcorrectness);
@@ -158,13 +163,17 @@ class qbehaviour_appstester extends question_behaviour_with_multiple_tries {
 
             $pendingstep->set_fraction($max_fraction);
 
-            //TODO: handle grading with some finished state for not yet checked attempts (probably with behaviour_vars or checking state of last attempt)
-            if ($max_fraction == 1.0) {
-                $pendingstep->set_state(question_state::$gradedright);
-            } else if ($max_fraction == 0.0) {
-                $pendingstep->set_state(question_state::$gradedwrong);
-            } else {
-                $pendingstep->set_state(question_state::$gradedpartial);
+            $laststep = $this->qa->get_last_step();
+            if ($laststep->get_state() === question_state::$complete) { // state "complete" on previous step means it is not checked yet, graded status will be assigned later
+                $pendingstep->set_state(question_state::$finished);
+            } else if ($laststep->get_state() === question_state::$invalid) { // state "invalid" means the answer from appstester server is received
+                if ($max_fraction == 1.0) {
+                    $pendingstep->set_state(question_state::$gradedright);
+                } else if ($max_fraction == 0.0) {
+                    $pendingstep->set_state(question_state::$gradedwrong);
+                } else {
+                    $pendingstep->set_state(question_state::$gradedpartial);
+                }
             }
         }
         $pendingstep->set_new_response_summary($this->question->summarise_response($response));

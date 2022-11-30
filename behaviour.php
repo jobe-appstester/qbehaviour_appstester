@@ -120,8 +120,7 @@ class qbehaviour_appstester extends question_behaviour_with_multiple_tries {
 
     public function process_submit(question_attempt_pending_step $pendingstep)
     {
-        //TODO: get rid of hardcode (maybe by finding more suitable state than "needsgrading")
-        if ($this->qa->get_state()->is_finished() && $this->qa->get_state() !== question_state::$needsgrading) {
+        if ($this->qa->get_state()->is_finished()) {
             return question_attempt::DISCARD;
         }
 
@@ -182,20 +181,21 @@ class qbehaviour_appstester extends question_behaviour_with_multiple_tries {
 
     public function process_save(question_attempt_pending_step $pendingstep)
     {
-        if ($this->qa->get_state()->is_finished() && $this->qa->get_state() /* !== question_state::$needsgrading */) {
+        if ($this->qa->get_state()->is_finished()) {
             return question_attempt::DISCARD;
         }
 
-        if ($this->is_complete_response($pendingstep)) {
-            $pendingstep->set_state(question_state::$complete);
-        } else {
-            $pendingstep->set_state(question_state::$needsgrading); // not reachable case, is_complete_response is always true
-        }
+//        if ($this->is_complete_response($pendingstep)) {
+//            $pendingstep->set_state(question_state::$complete);
+//        } else {
+//            $pendingstep->set_state(question_state::$needsgrading); // not reachable case, is_complete_response is always true
+//        }
 
         $status = question_attempt::KEEP;
 //        if ($pendingstep->get_state() == question_state::$complete) { // not sure if this case is reachable and\or needed
-            $pendingstep->set_state(question_state::$todo);
+//            $pendingstep->set_state(question_state::$todo);
 //        }
+        $pendingstep->set_state(question_state::$todo);
         return $status;
     }
 }

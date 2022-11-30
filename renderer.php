@@ -7,14 +7,14 @@ require_once(__DIR__ . '/../interactive/renderer.php');
 class qbehaviour_appstester_renderer extends qbehaviour_renderer {
     public function controls(question_attempt $qa, question_display_options $options) {
         if ($options->readonly === qbehaviour_interactive::TRY_AGAIN_VISIBLE ||
-            $options->readonly === qbehaviour_interactive::TRY_AGAIN_VISIBLE_READONLY) {
+                $options->readonly === qbehaviour_interactive::TRY_AGAIN_VISIBLE_READONLY) {
             return '';
         }
         return $this->submit_button($qa, $options);
     }
 
     public function feedback(question_attempt $qa, question_display_options $options) {
-        if (!$qa->get_state()->is_active() ||
+        if (!$qa->get_state()->is_active() || $qa->get_state() === question_state::$complete ||
             ($options->readonly !== qbehaviour_interactive::TRY_AGAIN_VISIBLE &&
                 $options->readonly !== qbehaviour_interactive::TRY_AGAIN_VISIBLE_READONLY)) {
             return '';

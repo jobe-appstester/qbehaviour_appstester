@@ -68,7 +68,7 @@ class qbehaviour_appstester extends question_behaviour_with_multiple_tries {
         } else if ($state === question_state::$invalid) {
             return get_string('checked', 'qbehaviour_appstester');
         } else if ($state === question_state::$finished) {
-            if ($this->qa->get_step($this->qa->get_num_steps()-2)->has_behaviour_var('status')) {
+            if ($this->qa->get_last_step_with_behaviour_var('submit') === $this->qa->get_last_step_with_behaviour_var('status')) {
                 return get_string('checking', 'qbehaviour_appstester');
             }
             return get_string('in_queue', 'qbehaviour_appstester');
@@ -124,16 +124,12 @@ class qbehaviour_appstester extends question_behaviour_with_multiple_tries {
             return question_attempt::DISCARD;
         }
 
-        if (!$this->is_complete_response($pendingstep)) { //TODO: refactor is_complete_response() or this code sample
-            $pendingstep->set_state(question_state::$needsgrading); // not reachable case, is_complete_response is always true
-        } else {
-            $pendingstep->set_state(question_state::$complete);
-            $pendingstep->set_fraction(0);
+        $pendingstep->set_state(question_state::$complete);
+        $pendingstep->set_fraction(0);
 
+        $response = $pendingstep->get_qt_data();
+        $pendingstep->set_new_response_summary($this->question->summarise_response($response));
 
-            $response = $pendingstep->get_qt_data();
-            $pendingstep->set_new_response_summary($this->question->summarise_response($response));
-        }
         return question_attempt::KEEP;
     }
 
@@ -163,9 +159,9 @@ class qbehaviour_appstester extends question_behaviour_with_multiple_tries {
             $pendingstep->set_fraction($max_fraction);
 
             $laststep = $this->qa->get_last_step();
-            if ($laststep->get_state() === question_state::$complete) { // state "complete" on previous step means it is not checked yet, graded status will be assigned later
+            if ($laststep->get_state() === question_state::$complete) {
                 $pendingstep->set_state(question_state::$finished);
-            } else if ($laststep->get_state() === question_state::$invalid) { // state "invalid" means the answer from appstester server is received
+            } else if ($laststep->get_state() === question_state::$invalid) {
                 if ($max_fraction == 1.0) {
                     $pendingstep->set_state(question_state::$gradedright);
                 } else if ($max_fraction == 0.0) {
@@ -184,17 +180,7 @@ class qbehaviour_appstester extends question_behaviour_with_multiple_tries {
         if ($this->qa->get_state()->is_finished()) {
             return question_attempt::DISCARD;
         }
-
-//        if ($this->is_complete_response($pendingstep)) {
-//            $pendingstep->set_state(question_state::$complete);
-//        } else {
-//            $pendingstep->set_state(question_state::$needsgrading); // not reachable case, is_complete_response is always true
-//        }
-
         $status = question_attempt::KEEP;
-//        if ($pendingstep->get_state() == question_state::$complete) { // not sure if this case is reachable and\or needed
-//            $pendingstep->set_state(question_state::$todo);
-//        }
         $pendingstep->set_state(question_state::$todo);
         return $status;
     }

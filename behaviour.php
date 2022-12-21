@@ -167,7 +167,7 @@ class qbehaviour_appstester extends question_behaviour_with_multiple_tries {
             $laststep = $this->qa->get_last_step();
             if ($laststep->get_state() === question_state::$complete) {
                 $pendingstep->set_state(question_state::$finished);
-            } else if ($laststep->get_state() === question_state::$invalid) {
+            } else {
                 if ($max_fraction == 1.0) {
                     $pendingstep->set_state(question_state::$gradedright);
                 } else if ($max_fraction == 0.0) {

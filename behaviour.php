@@ -168,10 +168,10 @@ class qbehaviour_appstester extends question_behaviour_with_multiple_tries {
             if ($laststep->get_state() === question_state::$complete) {
                 $pendingstep->set_state(question_state::$finished);
             } else {
-                if ($max_fraction == 1.0) {
-                    $pendingstep->set_state(question_state::$gradedright);
-                } else if ($max_fraction == 0.0) {
+                if ($max_fraction < 0.000001) {
                     $pendingstep->set_state(question_state::$gradedwrong);
+                } else if ($max_fraction > 0.999999) {
+                    $pendingstep->set_state(question_state::$gradedright);
                 } else {
                     $pendingstep->set_state(question_state::$gradedpartial);
                 }

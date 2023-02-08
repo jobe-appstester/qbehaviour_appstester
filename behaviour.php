@@ -22,7 +22,14 @@ class qbehaviour_appstester extends question_behaviour_with_multiple_tries {
     }
 
     public function adjust_display_options(question_display_options $options) {
-        $options->marks = question_display_options::MARK_AND_MAX;
+        $_question = $this->qa->get_question();
+        $_state = $this->qa->get_state();
+        if (($_state->is_active() && $_question->hideresult_whileactive)
+            || ($_state->is_finished() && $_question->hideresult_afterfinish)) {
+            $options->marks = question_display_options::MAX_ONLY;
+        } else {
+            $options->marks = question_display_options::MARK_AND_MAX;
+        }
 
         $save = clone($options);
         parent::adjust_display_options($options);
@@ -74,7 +81,9 @@ class qbehaviour_appstester extends question_behaviour_with_multiple_tries {
             }
             return get_string('in_queue', 'qbehaviour_appstester');
         }
-
+        if ($this->question->hideresult_afterfinish) {
+            $showcorrectness = false;
+        }
         return parent::get_state_string($showcorrectness);
     }
 

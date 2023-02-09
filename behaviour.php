@@ -8,25 +8,28 @@ class qbehaviour_appstester extends question_behaviour_with_multiple_tries {
     private const TRY_AGAIN_VISIBLE = 0x10;
     private const TRY_AGAIN_VISIBLE_READONLY = 0x11;
 
-    public function is_compatible_question(question_definition $question): bool
-    {
+    public function is_compatible_question(question_definition $question): bool {
         return $question instanceof qtype_appstester_question;
     }
 
-    public function can_finish_during_attempt(): bool
-    {
+    public function can_finish_during_attempt(): bool {
         return true;
     }
 
-    public function is_in_try_again_state()
-    {
+    public function is_in_try_again_state() {
         $laststep = $this->qa->get_last_step();
         return $this->qa->get_state()->is_active() && $laststep->has_behaviour_var('submit');
     }
 
-    public function adjust_display_options(question_display_options $options)
-    {
-        $options->marks = question_display_options::MARK_AND_MAX;
+    public function adjust_display_options(question_display_options $options) {
+        $_question = $this->qa->get_question();
+        $_state = $this->qa->get_state();
+        if (($_state->is_active() && $_question->hideresult_whileactive)
+            || ($_state->is_finished() && $_question->hideresult_afterfinish)) {
+            $options->marks = question_display_options::MAX_ONLY;
+        } else {
+            $options->marks = question_display_options::MARK_AND_MAX;
+        }
 
         $save = clone($options);
         parent::adjust_display_options($options);
@@ -41,8 +44,7 @@ class qbehaviour_appstester extends question_behaviour_with_multiple_tries {
         $options->numpartscorrect = $save->numpartscorrect;
     }
 
-    public function get_expected_data()
-    {
+    public function get_expected_data() {
         if ($this->is_in_try_again_state()) {
             return array(
                 'tryagain' => PARAM_BOOL,
@@ -55,23 +57,37 @@ class qbehaviour_appstester extends question_behaviour_with_multiple_tries {
         return parent::get_expected_data();
     }
 
-    public function get_state_string($showcorrectness)
-    {
+    protected function is_same_response(question_attempt_step $pendingstep) {
+        return $this->question->is_same_response(
+            $this->qa->get_last_step_with_behaviour_var('result')->get_qt_data(),
+            $pendingstep->get_qt_data()
+        );
+    }
+
+    public function get_state_string($showcorrectness) {
         $state = $this->qa->get_state();
 
-        if ($state === question_state::$needsgrading) {
+        if ($state === question_state::$complete) {
             if ($this->qa->get_last_step()->has_behaviour_var('status')) {
                 return get_string('checking', 'qbehaviour_appstester');
             }
 
             return get_string('in_queue', 'qbehaviour_appstester');
+        } else if ($state === question_state::$invalid) {
+            return get_string('checked', 'qbehaviour_appstester');
+        } else if ($state === question_state::$finished) {
+            if ($this->qa->get_last_step_with_behaviour_var('submit') === $this->qa->get_last_step_with_behaviour_var('status')) {
+                return get_string('checking', 'qbehaviour_appstester');
+            }
+            return get_string('in_queue', 'qbehaviour_appstester');
         }
-
+        if ($this->question->hideresult_afterfinish) {
+            $showcorrectness = false;
+        }
         return parent::get_state_string($showcorrectness);
     }
 
-    public function process_action(question_attempt_pending_step $pendingstep)
-    {
+    public function process_action(question_attempt_pending_step $pendingstep) {
         if ($pendingstep->has_behaviour_var('finish')) {
             return $this->process_finish($pendingstep);
         }
@@ -92,8 +108,7 @@ class qbehaviour_appstester extends question_behaviour_with_multiple_tries {
         }
     }
 
-    public function summarise_action(question_attempt_step $step)
-    {
+    public function summarise_action(question_attempt_step $step) {
         if ($step->has_behaviour_var('comment')) {
             return $this->summarise_manual_comment($step);
         } else if ($step->has_behaviour_var('finish')) {
@@ -105,38 +120,41 @@ class qbehaviour_appstester extends question_behaviour_with_multiple_tries {
         }
     }
 
-    public function process_try_again(question_attempt_pending_step $pendingstep)
-    {
+    public function process_try_again(question_attempt_pending_step $pendingstep) {
         $pendingstep->set_state(question_state::$todo);
         return question_attempt::KEEP;
     }
 
-    public function process_submit(question_attempt_pending_step $pendingstep)
-    {
-        if ($this->qa->get_state()->is_finished()) {
-            return question_attempt::DISCARD;
-        }
+    public function process_submit(question_attempt_pending_step $pendingstep) {
+        // 08.12.2022
+        // After changes to plugin, separate finishing step is always generated by behaviour, BUT...
+        // In case of regrading old attempts which don't have separate finishing step,
+        // we might lose results of students, therefore we must keep ALL attempts with behaviour var "-submit",
+        // even those, which have graded state (like gradedwrong, gradedright, etc.)
+        // TODO: this MUST be reverted ASAP, we will need to do all the necessary regrading of these attempts BEFORE that
+//        if ($this->qa->get_state()->is_finished()) {
+//            return question_attempt::DISCARD;
+//        }
 
         if (!$this->is_complete_response($pendingstep)) {
-            $pendingstep->set_state(question_state::$invalid);
-        } else {
-            $pendingstep->set_state(question_state::$needsgrading);
-            $pendingstep->set_fraction(0);
-
-
-            $response = $pendingstep->get_qt_data();
-            $pendingstep->set_new_response_summary($this->question->summarise_response($response));
+            return question_attempt::DISCARD;
         }
+        if ($this->is_same_response($pendingstep)) {
+            return question_attempt::DISCARD;
+        }
+        $pendingstep->set_state(question_state::$complete);
+        $pendingstep->set_fraction(0);
+        $response = $pendingstep->get_qt_data();
+        $pendingstep->set_new_response_summary($this->question->summarise_response($response));
+
         return question_attempt::KEEP;
     }
 
-    protected function adjust_fraction($fraction, question_attempt_pending_step $pendingstep)
-    {
+    protected function adjust_fraction($fraction, question_attempt_pending_step $pendingstep) {
         return $fraction;
     }
 
-    public function process_finish(question_attempt_pending_step $pendingstep)
-    {
+    public function process_finish(question_attempt_pending_step $pendingstep) {
         if ($this->qa->get_state()->is_finished()) {
             return question_attempt::DISCARD;
         }
@@ -155,25 +173,32 @@ class qbehaviour_appstester extends question_behaviour_with_multiple_tries {
 
             $pendingstep->set_fraction($max_fraction);
 
-            if ($max_fraction === 1) {
-                $pendingstep->set_state(question_state::$gradedright);
-            } else if ($max_fraction === 0) {
-                $pendingstep->set_state(question_state::$gradedwrong);
+            $laststep = $this->qa->get_last_step();
+            if ($laststep->get_state() === question_state::$complete) {
+                $pendingstep->set_state(question_state::$finished);
             } else {
-                $pendingstep->set_state(question_state::$gradedpartial);
+                if ($max_fraction < 0.000001) {
+                    $pendingstep->set_state(question_state::$gradedwrong);
+                } else if ($max_fraction > 0.999999) {
+                    $pendingstep->set_state(question_state::$gradedright);
+                } else {
+                    $pendingstep->set_state(question_state::$gradedpartial);
+                }
             }
         }
         $pendingstep->set_new_response_summary($this->question->summarise_response($response));
         return question_attempt::KEEP;
     }
 
-    public function process_save(question_attempt_pending_step $pendingstep)
-    {
-        $status = parent::process_save($pendingstep);
-        if ($status == question_attempt::KEEP &&
-            $pendingstep->get_state() == question_state::$complete) {
-            $pendingstep->set_state(question_state::$todo);
+    public function process_save(question_attempt_pending_step $pendingstep) {
+        /*
+        if ($this->qa->get_state()->is_finished()) {
+            return question_attempt::DISCARD;
         }
+        $status = question_attempt::KEEP;
+        $pendingstep->set_state(question_state::$todo);
         return $status;
+        */
+        return question_attempt::DISCARD;
     }
 }
